@@ -1,0 +1,442 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Laceration Simulator</title>
+    <style>
+        body { margin: 0; background: #050505; overflow: hidden; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; cursor: crosshair; }
+        
+        .panel { 
+            position: absolute; background: rgba(20, 20, 20, 0.95); 
+            color: white; padding: 12px; border-radius: 10px; 
+            border: 1px solid #444; z-index: 100;
+            transition: border-color 0.3s ease, top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+
+        #main-ui { top: 15px; left: 15px; width: 150px; }
+        
+        #theme-ui { 
+            top: 15px; 
+            left: 65%; 
+            transform: translateX(-50%);
+            display: flex; 
+            gap: 15px; 
+        }
+        
+        .picker-group { display: flex; flex-direction: column; align-items: center; font-size: 10px; gap: 4px; }
+        input[type="color"] { border: none; width: 30px; height: 30px; cursor: pointer; background: none; padding: 0; }
+
+
+        #info-btn { 
+            top: 15px; right: 15px; width: 35px; height: 35px; 
+            display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; font-size: 20px; 
+        }
+
+
+        #collapse-btn {
+            top: 95px; right: 15px; width: 30px; height: 30px; 
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 14px;
+            transition: top 0.5s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+        }
+
+
+        .toggle-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 10px; color: #aaa; }
+        .toggle-group input { 
+            width: auto; 
+            margin: 0; 
+            cursor: pointer;
+            appearance: auto;
+        }
+
+
+        #lock-btn { margin-top: 10px; background: #333; padding: 8px; border-radius: 4px; font-size: 12px; text-align: center; cursor: pointer; border: 1px solid #555; user-select: none; }
+        #lock-menu { display: none; margin-top: 8px; flex-direction: column; gap: 4px; background: #111; padding: 5px; border-radius: 4px; }
+        .lock-opt { padding: 8px; font-size: 12px; background: #222; cursor: pointer; border-radius: 2px; text-align: center; border: 1px solid transparent; user-select: none; }
+        
+        #info-modal { 
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 85%; max-width: 320px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+
+        .sub-text { font-size: 9px; color: #888; margin-top: 4px; text-transform: uppercase; }
+        input[type="range"] { width: 100%; cursor: pointer; margin-top: 5px; }
+        label { font-size: 10px; font-weight: bold; color: #aaa; text-transform: uppercase; }
+        .close-btn { margin-top: 15px; padding: 10px 20px; border: 2px solid; border-radius: 6px; cursor: pointer; display: inline-block; font-size: 14px; font-weight: bold; user-select: none; }
+        
+        .hidden-ui { top: -250px !important; }
+        .arrow-up { top: 15px !important; } 
+    </style>
+</head>
+<body>
+
+
+<div id="main-ui" class="panel">
+    <label>Sharpness</label>
+    <input id="sharpSlider" type="range" min="1" max="10" value="3">
+    
+    <div class="toggle-group">
+        <input type="checkbox" id="staticScratch" checked>
+        <span>Lock Theme</span>
+    </div>
+    <div class="toggle-group">
+        <input type="checkbox" id="persistDepth" checked>
+        <span>Lock Depth</span>
+    </div>
+
+
+    <div id="lock-btn">🔒 <span id="current-lock-label">Bone</span></div>
+    <div id="lock-menu">
+        <div class="lock-opt" data-depth="0">Epidermis</div>
+        <div class="lock-opt" data-depth="1">Dermis</div>
+        <div class="lock-opt" data-depth="2">Fat</div>
+        <div class="lock-opt" data-depth="3">Fascia</div>
+        <div class="lock-opt" data-depth="4">Muscle</div>
+        <div class="lock-opt active" data-depth="5">Bone</div>
+    </div>
+</div>
+
+
+<div id="theme-ui" class="panel">
+    <div class="picker-group">
+        <input type="color" id="bgPicker" value="#050505">
+        <span>BG</span>
+    </div>
+    <div class="picker-group">
+        <input type="color" id="themePicker" value="#808080">
+        <span>THEME</span>
+    </div>
+</div>
+
+
+<div id="info-btn" class="panel">ℹ️</div>
+<div id="collapse-btn" class="panel">^</div>
+
+
+<div id="info-modal" class="panel">
+    <h3 style="margin-top:0">Information</h3>
+    <p>Created by Botony Newton-Knudson</p>
+    <p style="font-size: 13px; color: #ddd; line-height: 1.5;">If you or a loved one have thoughts of suicide or self-harm please contact your local suicide hotline. In the US, dial <b>988</b>.</p>
+    <div class="sub-text" style="margin-bottom:5px">Created: Jan 11 2026</div>
+    <div class="sub-text" style="margin-bottom:5px">Last updated: Jan 12 2026</div>
+    <div class="sub-text" style="margin-bottom:10px">Version 1.9</div>
+    <div class="close-btn" id="close-info">CLOSE</div>
+</div>
+
+
+<canvas id="canvas"></canvas>
+
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const sharpSlider = document.getElementById("sharpSlider");
+const bgPicker = document.getElementById("bgPicker");
+const themePicker = document.getElementById("themePicker");
+const lockBtn = document.getElementById("lock-btn");
+const lockMenu = document.getElementById("lock-menu");
+const infoBtn = document.getElementById("info-btn");
+const collapseBtn = document.getElementById("collapse-btn");
+const infoModal = document.getElementById("info-modal");
+const closeInfo = document.getElementById("close-info");
+const staticScratch = document.getElementById("staticScratch");
+const persistDepth = document.getElementById("persistDepth");
+const allPanels = document.querySelectorAll('.panel');
+const checkBoxes = document.querySelectorAll('.toggle-group input');
+
+
+let cuts = [];
+let stroke = [];
+let isDrawing = false;
+let lastTap = 0;
+let uiVisible = true;
+let maxAllowedDepth = 5;
+const cache = {};
+
+
+const LAYERS = [
+    { name: "scratch", color: "#800000", resistance: 1.0 }, 
+    { name: "flesh",   color: "#ff7a7a", resistance: 1.0 }, 
+    { name: "beans",   color: "beans-pat", resistance: 0.4 }, 
+    { name: "pearl",   color: "pearl-grad", resistance: 0.5 },
+    { name: "taffy",   color: "taffy-pat", resistance: 2.5 },
+    { name: "bedrock", color: "bedrock-pat", resistance: 1.0 }
+];
+
+
+function updateTheme() {
+    const themeColor = themePicker.value;
+    const r = parseInt(themeColor.slice(1,3), 16);
+    const g = parseInt(themeColor.slice(3,5), 16);
+    const b = parseInt(themeColor.slice(5,7), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    const isVeryBright = brightness > 230; 
+
+
+    allPanels.forEach(p => p.style.borderColor = themeColor);
+    sharpSlider.style.accentColor = themeColor;
+    infoBtn.style.color = themeColor;
+    collapseBtn.style.color = themeColor;
+    
+    checkBoxes.forEach(cb => {
+        cb.style.accentColor = isVeryBright ? "#000000" : themeColor;
+    });
+    
+    closeInfo.style.borderColor = themeColor;
+    closeInfo.style.color = themeColor;
+    const activeLock = document.querySelector('.lock-opt.active');
+    if(activeLock) activeLock.style.backgroundColor = themeColor;
+}
+
+
+collapseBtn.onclick = () => {
+    uiVisible = !uiVisible;
+    collapseBtn.innerText = uiVisible ? "^" : "v";
+    const controls = [document.getElementById("main-ui"), document.getElementById("theme-ui"), document.getElementById("info-btn")];
+    controls.forEach(el => el.classList.toggle("hidden-ui", !uiVisible));
+    collapseBtn.classList.toggle("arrow-up", !uiVisible);
+};
+
+
+infoBtn.onclick = () => { infoModal.style.display = "block"; };
+closeInfo.onclick = () => { infoModal.style.display = "none"; };
+lockBtn.onclick = () => { lockMenu.style.display = lockMenu.style.display === "flex" ? "none" : "flex"; };
+
+
+document.querySelectorAll('.lock-opt').forEach(opt => {
+    opt.onclick = () => {
+        maxAllowedDepth = parseInt(opt.dataset.depth);
+        document.querySelectorAll('.lock-opt').forEach(o => {
+            o.classList.remove('active');
+            o.style.backgroundColor = "#222";
+        });
+        opt.classList.add('active');
+        opt.style.backgroundColor = themePicker.value;
+        document.getElementById('current-lock-label').innerText = opt.innerText;
+        lockMenu.style.display = 'none';
+    };
+});
+
+
+themePicker.oninput = updateTheme;
+bgPicker.oninput = () => { canvas.style.backgroundColor = bgPicker.value; };
+updateTheme();
+
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+
+function getMidpoint(points) {
+    let x = 0, y = 0;
+    points.forEach(p => { x += p.x; y += p.y; });
+    return { x: x / points.length, y: y / points.length };
+}
+
+
+function handleStart(x, y) {
+    const now = Date.now();
+    if (now - lastTap < 300) cuts = [];
+    lastTap = now;
+    isDrawing = true;
+    stroke = [{ x: x, y: y }];
+}
+
+
+function handleMove(x, y) {
+    if (!isDrawing) return;
+    stroke.push({ x: x, y: y });
+}
+
+
+function handleEnd() {
+    if (!isDrawing || stroke.length < 5) { isDrawing = false; return; }
+    isDrawing = false;
+
+
+    const currentMid = getMidpoint(stroke);
+    const sVal = parseFloat(sharpSlider.value);
+    
+    let target = cuts.find(c => {
+        const mid = getMidpoint(c.points);
+        return Math.hypot(mid.x - currentMid.x, mid.y - currentMid.y) < 70;
+    });
+
+
+    if (target) {
+        if (maxAllowedDepth > target.maxDepthAtCreation) {
+            target.maxDepthAtCreation = maxAllowedDepth;
+        }
+
+
+        const oldDepth = target.depth;
+        const currentLimit = persistDepth.checked ? target.maxDepthAtCreation : maxAllowedDepth;
+        
+        const currentLayerIdx = Math.floor(target.depth);
+        const layerResist = (LAYERS[currentLayerIdx] && LAYERS[currentLayerIdx].resistance) ? LAYERS[currentLayerIdx].resistance : 1.0;
+        
+        // Minor buff to depth calculation to ensure you actually "break through" to see the locked layer
+        target.depth = Math.min(currentLimit + 0.9, target.depth + (sVal * 0.6 * layerResist));
+        
+        const isAtLimit = target.depth >= currentLimit;
+        const wasAtLimit = oldDepth >= currentLimit;
+        
+        let allowWiden = true;
+        
+        if (isAtLimit) {
+            if (!wasAtLimit) {
+                target.limitHits = 0;
+            } else {
+                target.limitHits = (target.limitHits || 0);
+                let allowedExtra = 0;
+                if (sVal <= 2) allowedExtra = 2;
+                else if (sVal <= 4) allowedExtra = 1;
+
+
+                if (target.limitHits < allowedExtra) target.limitHits++;
+                else allowWiden = false;
+            }
+        }
+
+
+        if (target.depth >= 1 && allowWiden) {
+            target.targetWidth += (sVal * 3 * layerResist);
+        }
+    } else {
+        cuts.push({
+            points: stroke,
+            width: 2 + sVal,
+            targetWidth: 2 + sVal,
+            depth: Math.min(maxAllowedDepth + 0.8, 0.8), 
+            limitHits: 0,
+            maxDepthAtCreation: maxAllowedDepth
+        });
+    }
+}
+
+
+canvas.addEventListener("touchstart", e => {
+    if (e.target !== canvas) return;
+    handleStart(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+canvas.addEventListener("touchmove", e => {
+    e.preventDefault();
+    handleMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+canvas.addEventListener("touchend", handleEnd);
+canvas.addEventListener("mousedown", e => handleStart(e.clientX, e.clientY));
+canvas.addEventListener("mousemove", e => handleMove(e.clientX, e.clientY));
+canvas.addEventListener("mouseup", handleEnd);
+
+
+function drawBladePath(points, width) {
+    if (width < 0.5) return;
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+        const t = i / (points.length - 1);
+        const k = width * (1 - Math.abs(t - 0.5) * 2);
+        const a = i < points.length - 1 ? Math.atan2(points[i+1].y - points[i].y, points[i+1].x - points[i].x) : 0;
+        const ox = Math.sin(a) * k, oy = -Math.cos(a) * k;
+        if (i === 0) ctx.moveTo(points[i].x + ox, points[i].y + oy);
+        else ctx.lineTo(points[i].x + ox, points[i].y + oy);
+    }
+    for (let i = points.length - 1; i >= 0; i--) {
+        const t = i / (points.length - 1);
+        const k = width * (1 - Math.abs(t - 0.5) * 2);
+        const a = i > 0 ? Math.atan2(points[i].y - points[i-1].y, points[i].x - points[i-1].x) : 0;
+        ctx.lineTo(points[i].x - Math.sin(a) * k, points[i].y + Math.cos(a) * k);
+    }
+    ctx.closePath();
+}
+
+
+function getTexture(type) {
+    if (type === "theme") return themePicker.value;
+    if (cache[type]) return cache[type];
+    const pC = document.createElement("canvas"); pC.width = pC.height = 64;
+    const pctx = pC.getContext("2d");
+    if (type === "beans-pat") {
+        pctx.fillStyle = "#ffd84d"; pctx.fillRect(0, 0, 64, 64);
+        for (let i = 0; i < 12; i++) {
+            pctx.fillStyle = "#ffea8a";
+            pctx.beginPath(); pctx.arc(Math.random()*64, Math.random()*64, 7, 0, 7); pctx.fill();
+        }
+        return cache[type] = ctx.createPattern(pC, "repeat");
+    }
+    if (type === "pearl-grad") {
+        const g = ctx.createRadialGradient(32, 32, 5, 32, 32, 45);
+        g.addColorStop(0, "#fff"); g.addColorStop(1, "#bbb");
+        return cache[type] = g;
+    }
+    if (type === "taffy-pat") {
+        pctx.fillStyle = "#ffbde0"; pctx.fillRect(0, 0, 64, 64);
+        pctx.strokeStyle = "#db0062"; pctx.lineWidth = 3;
+        for (let i = 0; i < 5; i++) {
+            pctx.beginPath(); pctx.moveTo(0, Math.random()*64); pctx.lineTo(64, Math.random()*64); pctx.stroke();
+        }
+        return cache[type] = ctx.createPattern(pC, "repeat");
+    }
+    if (type === "bedrock-pat") {
+        pctx.fillStyle = "#fcfcfc"; pctx.fillRect(0, 0, 64, 64);
+        pctx.fillStyle = "#c0c0c0";
+        for (let i = 0; i < 15; i++) {
+            pctx.beginPath(); pctx.arc(Math.random()*64, Math.random()*64, 4, 0, 7); pctx.fill();
+        }
+        return cache[type] = ctx.createPattern(pC, "repeat");
+    }
+    return cache[type] = type;
+}
+
+
+function render() {
+    ctx.fillStyle = bgPicker.value;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    cuts.forEach(cut => {
+        if (cut.width < cut.targetWidth) cut.width += (cut.targetWidth - cut.width) * 0.1;
+
+
+        const currentLimit = persistDepth.checked ? cut.maxDepthAtCreation : maxAllowedDepth;
+        const currentMaxRender = Math.min(Math.floor(cut.depth), currentLimit);
+        
+        for (let i = 0; i <= currentMaxRender; i++) {
+            let vWidth = cut.width - (i * 8);
+            if (LAYERS[i].name === "flesh") vWidth += 24; 
+            if (LAYERS[i].name === "beans") vWidth += 20; 
+            if (LAYERS[i].name === "scratch") vWidth = Math.min(vWidth, 10);
+
+
+            if (vWidth > 1) {
+                drawBladePath(cut.points, vWidth);
+                let color = LAYERS[i].color;
+                if (LAYERS[i].name === "scratch" && !staticScratch.checked) {
+                    color = themePicker.value;
+                }
+                ctx.fillStyle = getTexture(color);
+                ctx.fill();
+            }
+        }
+    });
+
+
+    if (isDrawing) {
+        drawBladePath(stroke, 4 + parseFloat(sharpSlider.value));
+        ctx.fillStyle = themePicker.value;
+        ctx.fill();
+    }
+    requestAnimationFrame(render);
+}
+render();
+</script>
+</body>
+</html>
